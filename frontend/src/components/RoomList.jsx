@@ -1,0 +1,335 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
+const RoomList = ({ onRoomSelect, selectedRoom }) => {
+  const [rooms, setRooms] = useState([]);
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [newRoom, setNewRoom] = useState({
+    name: '',
+    description: '',
+    isPrivate: false
+  });
+  const [friends, setFriends] = useState([]);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [error, setError] = useState('');
+  const { user } = useAuth();
+
+  // Fetch user's rooms
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const res = await axios.get('http://localhost:5000/api/rooms');
+        setRooms(res.data);
+      } catch (error) {
+        console.error('Error fetching rooms:', error);
+      }
+    };
+
+    if (user) {
+      fetchRooms();
+    }
+  }, [user]);
+
+  // Fetch friends when creating a room
+  useEffect(() => {
+    const fetchFriends = async () => {
+      if (showCreateRoom) {
+        try {
+          const res = await axios.get('http://localhost:5000/api/friends/list');
+          if (res.data && Array.isArray(res.data)) {
+            setFriends(res.data);
+          } else {
+            setFriends([]);
+          }
+        } catch (error) {
+          console.error('Error fetching friends:', error);
+          setFriends([]);
+        }
+      }
+    };
+
+    fetchFriends();
+  }, [showCreateRoom]);
+
+  // Handle creating a new room
+  const handleCreateRoom = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    try {
+      const roomData = {
+        ...newRoom,
+        memberIds: selectedFriends
+      };
+      const res = await axios.post('http://localhost:5000/api/rooms', roomData);
+      setRooms([res.data, ...rooms]);
+      setNewRoom({ name: '', description: '', isPrivate: false });
+      setSelectedFriends([]);
+      setShowCreateRoom(false);
+      // Automatically open the new room
+      onRoomSelect(res.data);
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to create room');
+    }
+  };
+
+  // Toggle friend selection
+  const toggleFriendSelection = (friendId) => {
+    setSelectedFriends(prev => 
+      prev.includes(friendId)
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
+  };
+
+  // Handle joining a room
+  const handleJoinRoom = async (roomId) => {
+    try {
+      const res = await axios.post('http://localhost:5000/api/rooms/join', { roomId });
+      setRooms(rooms.map(room => 
+        room._id === roomId ? res.data : room
+      ));
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to join room');
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 shadow-lg">
+      {/* Header */}
+      <div className="px-6 py-6 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-purple-600">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white">Chat Rooms</h3>
+            <p className="text-sm text-indigo-100 mt-1">Stay connected</p>
+          </div>
+          <button
+            onClick={() => setShowCreateRoom(true)}
+            className="bg-white hover:bg-gray-100 text-indigo-600 rounded-full p-3 shadow-lg focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 transform hover:scale-110 transition-all duration-200"
+            title="Create new room"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Room List */}
+      <div className="flex-1 overflow-y-auto">
+        {rooms.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="h-20 w-20 mx-auto mb-4 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center">
+              <svg className="h-10 w-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <p className="text-gray-500 font-medium">No rooms yet</p>
+            <p className="text-sm text-gray-400 mt-1">Create one to get started!</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {rooms.map((room) => (
+              <div
+                key={room._id}
+                className={`px-5 py-4 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 cursor-pointer transition-all duration-200 ${
+                  selectedRoom && selectedRoom._id === room._id ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-l-4 border-indigo-500' : ''
+                }`}
+                onClick={() => onRoomSelect(room)}
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md transition-transform duration-200 ${
+                      selectedRoom && selectedRoom._id === room._id 
+                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 scale-110' 
+                        : 'bg-gradient-to-br from-indigo-400 to-purple-500 hover:scale-105'
+                    }`}>
+                      {room.name.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1 min-w-0">
+                    <p className={`text-sm font-semibold truncate ${
+                      selectedRoom && selectedRoom._id === room._id ? 'text-indigo-900' : 'text-gray-900'
+                    }`}>
+                      {room.name}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center">
+                      <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                      </svg>
+                      {room.members.length} members
+                      {room.isPrivate && (
+                        <span className="ml-2 flex items-center">
+                          <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                          </svg>
+                          Private
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {room.lastMessage && (
+                    <div className="flex-shrink-0 text-xs text-gray-400 font-medium ml-2">
+                      {new Date(room.lastMessage.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Room Modal */}
+      {showCreateRoom && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5 rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white">Create New Room</h3>
+              <p className="text-sm text-indigo-100 mt-1">Start a new conversation</p>
+            </div>
+            <div className="p-6">
+              {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
+                  <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleCreateRoom} className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="room-name">
+                    Room Name
+                  </label>
+                  <input
+                    id="room-name"
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                    placeholder="Enter room name"
+                    value={newRoom.name}
+                    onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="room-description">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    id="room-description"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 resize-none"
+                    rows="3"
+                    placeholder="What's this room about?"
+                    value={newRoom.description}
+                    onChange={(e) => setNewRoom({ ...newRoom, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex items-center p-3 bg-indigo-50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="private-room"
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    checked={newRoom.isPrivate}
+                    onChange={(e) => setNewRoom({ ...newRoom, isPrivate: e.target.checked })}
+                  />
+                  <label htmlFor="private-room" className="ml-3 text-sm font-medium text-gray-700 flex items-center">
+                    <svg className="h-4 w-4 mr-2 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    Private Room
+                  </label>
+                </div>
+
+                {/* Friends Selection */}
+                <div>
+                  <label className="block text-gray-700 text-sm font-semibold mb-3">
+                    Add Friends to Room
+                  </label>
+                  <div className="max-h-60 overflow-y-auto border-2 border-gray-200 rounded-lg p-3 space-y-2">
+                    {friends.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">No friends available</p>
+                    ) : (
+                      friends.map((friend) => (
+                        <div
+                          key={friend._id}
+                          onClick={() => toggleFriendSelection(friend._id)}
+                          className={`flex items-center p-2 rounded-lg cursor-pointer transition-all ${
+                            selectedFriends.includes(friend._id)
+                              ? 'bg-indigo-100 border-2 border-indigo-500'
+                              : 'hover:bg-gray-50 border-2 border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedFriends.includes(friend._id)}
+                            onChange={() => toggleFriendSelection(friend._id)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                          />
+                          <div className="ml-3 flex items-center flex-1">
+                            {friend.avatar ? (
+                              <img
+                                src={friend.avatar}
+                                alt={friend.username}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-semibold">
+                                {friend.username.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="ml-3 flex-1">
+                              <p className="text-sm font-medium text-gray-900">{friend.username}</p>
+                              <p className="text-xs text-gray-500 flex items-center">
+                                <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
+                                  friend.status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+                                }`}></span>
+                                {friend.status === 'online' ? 'Online' : 'Offline'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {selectedFriends.length > 0 && (
+                    <p className="text-xs text-indigo-600 mt-2">
+                      {selectedFriends.length} friend{selectedFriends.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 font-medium transition-all duration-200"
+                    onClick={() => {
+                      setShowCreateRoom(false);
+                      setSelectedFriends([]);
+                      setNewRoom({ name: '', description: '', isPrivate: false });
+                      setError('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    Create Room
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RoomList;

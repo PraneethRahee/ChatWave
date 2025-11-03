@@ -1,0 +1,444 @@
+const Message = require('../models/Message');
+const Room = require('../models/Room');
+const User = require('../models/User');
+const upload = require('../utils/fileUpload');
+
+// Get socket.io instance (will be set from server.js)
+let io = null;
+const setSocketIO = (socketIO) => {
+  io = socketIO;
+};
+
+// Get messages for a room with unread tracking
+const getRoomMessages = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    
+    const isMember = room.members.some(
+      member => member.user.toString() === req.user._id.toString()
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to access messages in this room' });
+    }
+    
+    // Get messages with pagination (exclude deleted)
+    const messages = await Message.find({ 
+      room: roomId,
+      isDeleted: false 
+    })
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+    
+    // Reverse to get chronological order
+    const reversedMessages = messages.reverse();
+    
+    // Mark messages as read and reset unread count
+    const unreadCountIndex = room.unreadCounts.findIndex(
+      uc => uc.user.toString() === req.user._id.toString()
+    );
+    
+    if (unreadCountIndex !== -1) {
+      room.unreadCounts[unreadCountIndex].count = 0;
+      if (messages.length > 0) {
+        room.unreadCounts[unreadCountIndex].lastReadMessage = messages[messages.length - 1]._id;
+      }
+    } else {
+      room.unreadCounts.push({
+        user: req.user._id,
+        count: 0,
+        lastReadMessage: messages.length > 0 ? messages[messages.length - 1]._id : null
+      });
+    }
+    
+    await room.save();
+    
+    res.json(reversedMessages);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Send a message
+const sendMessage = async (req, res) => {
+  try {
+    const { roomId, content, type = 'text', replyTo } = req.body;
+    
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    
+    const isMember = room.members.some(
+      member => member.user.toString() === req.user._id.toString()
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to send messages in this room' });
+    }
+
+    if (room.isPrivate && room.members.length === 2) {
+      const currentUser = await User.findById(req.user._id);
+      const otherMember = room.members.find(
+        m => m.user.toString() !== req.user._id.toString()
+      );
+      
+      if (otherMember && !currentUser.friends.includes(otherMember.user)) {
+        return res.status(403).json({ 
+          message: 'You can only message users who have accepted your friend request' 
+        });
+      }
+    }
+    
+    const messageData = {
+      content,
+      sender: req.user._id,
+      room: roomId,
+      type
+    };
+    
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+    
+    if (req.file) {
+      messageData.fileUrl = req.file.path;
+      messageData.fileName = req.file.originalname;
+      messageData.type = req.file.mimetype.startsWith('image/') ? 'image' : 'file';
+    }
+    
+    const message = await Message.create(messageData);
+    
+    room.lastMessage = message._id;
+    
+    // Increment unread count for all members except sender
+    room.members.forEach(member => {
+      if (member.user.toString() !== req.user._id.toString()) {
+        const unreadIndex = room.unreadCounts.findIndex(
+          uc => uc.user.toString() === member.user.toString()
+        );
+        if (unreadIndex !== -1) {
+          room.unreadCounts[unreadIndex].count += 1;
+        } else {
+          room.unreadCounts.push({
+            user: member.user,
+            count: 1
+          });
+        }
+      }
+    });
+    
+    await room.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar');
+    
+    res.status(201).json(populatedMessage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Upload file and send message
+const uploadFile = async (req, res) => {
+  try {
+    const { roomId, content, replyTo } = req.body;
+    
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    
+    const isMember = room.members.some(
+      member => member.user.toString() === req.user._id.toString()
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to send messages in this room' });
+    }
+
+    if (room.isPrivate && room.members.length === 2) {
+      const currentUser = await User.findById(req.user._id);
+      const otherMember = room.members.find(
+        m => m.user.toString() !== req.user._id.toString()
+      );
+      
+      if (otherMember && !currentUser.friends.includes(otherMember.user)) {
+        return res.status(403).json({ 
+          message: 'You can only message users who have accepted your friend request' 
+        });
+      }
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    const messageData = {
+      content: content || '',
+      sender: req.user._id,
+      room: roomId,
+      fileUrl: req.file.path,
+      fileName: req.file.originalname,
+      type: req.file.mimetype.startsWith('image/') ? 'image' : 'file'
+    };
+    
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+    
+    const message = await Message.create(messageData);
+    
+    room.lastMessage = message._id;
+    
+    room.members.forEach(member => {
+      if (member.user.toString() !== req.user._id.toString()) {
+        const unreadIndex = room.unreadCounts.findIndex(
+          uc => uc.user.toString() === member.user.toString()
+        );
+        if (unreadIndex !== -1) {
+          room.unreadCounts[unreadIndex].count += 1;
+        } else {
+          room.unreadCounts.push({
+            user: member.user,
+            count: 1
+          });
+        }
+      }
+    });
+    
+    await room.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar');
+    
+    res.status(201).json(populatedMessage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Delete message
+const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this message' });
+    }
+    
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.content = 'This message was deleted';
+    await message.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar');
+    
+    // Emit message update via socket
+    if (io) {
+      io.to(message.room.toString()).emit('messageUpdated', populatedMessage);
+    }
+    
+    res.json({ message: 'Message deleted successfully', data: populatedMessage });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Edit message
+const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to edit this message' });
+    }
+    
+    if (message.isDeleted) {
+      return res.status(400).json({ message: 'Cannot edit deleted message' });
+    }
+    
+    message.content = content;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar')
+      .populate('reactions.user', 'username avatar');
+    
+    // Emit message update via socket
+    if (io) {
+      io.to(message.room.toString()).emit('messageUpdated', populatedMessage);
+    }
+    
+    res.json(populatedMessage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Add reaction to message
+const addReaction = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    const existingReaction = message.reactions.find(
+      r => r.user.toString() === req.user._id.toString() && r.emoji === emoji
+    );
+    
+    if (existingReaction) {
+      message.reactions = message.reactions.filter(
+        r => !(r.user.toString() === req.user._id.toString() && r.emoji === emoji)
+      );
+    } else {
+      message.reactions.push({
+        user: req.user._id,
+        emoji
+      });
+    }
+    
+    await message.save();
+    
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'username avatar')
+      .populate('reactions.user', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar');
+    
+    // Emit message update via socket
+    if (io) {
+      io.to(message.room.toString()).emit('messageUpdated', populatedMessage);
+    }
+    
+    res.json(populatedMessage);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Search messages
+const searchMessages = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { query } = req.query;
+    
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    
+    const isMember = room.members.some(
+      member => member.user.toString() === req.user._id.toString()
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to search messages in this room' });
+    }
+    
+    const messages = await Message.find({
+      room: roomId,
+      isDeleted: false,
+      content: { $regex: query, $options: 'i' }
+    })
+      .populate('sender', 'username avatar')
+      .populate('replyTo', 'content sender')
+      .populate('replyTo.sender', 'username avatar')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.json(messages.reverse());
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Mark messages as read
+const markAsRead = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    const room = await Room.findById(message.room);
+    const isMember = room.members.some(
+      member => member.user.toString() === req.user._id.toString()
+    );
+    
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to access this message' });
+    }
+    
+    const alreadyRead = message.readBy.some(
+      read => read.user.toString() === req.user._id.toString()
+    );
+    
+    if (!alreadyRead) {
+      message.readBy.push({ user: req.user._id });
+      await message.save();
+    }
+    
+    res.json({ message: 'Message marked as read' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = {
+  getRoomMessages,
+  sendMessage,
+  uploadFile,
+  markAsRead,
+  deleteMessage,
+  editMessage,
+  addReaction,
+  searchMessages,
+  setSocketIO
+};

@@ -1,0 +1,63 @@
+// Browser notifications utility
+let permissionGranted = false;
+
+export const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) {
+    console.log('This browser does not support notifications');
+    return false;
+  }
+
+  if (Notification.permission === 'granted') {
+    permissionGranted = true;
+    return true;
+  }
+
+  if (Notification.permission !== 'denied') {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      permissionGranted = true;
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const showNotification = (title, options = {}) => {
+  if (!('Notification' in window)) {
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    const notification = new Notification(title, {
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      ...options
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+
+    // Auto close after 5 seconds
+    setTimeout(() => {
+      notification.close();
+    }, 5000);
+  }
+};
+
+export const playNotificationSound = () => {
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPRgjMGHm7A7+OZURAKS6Xh8r5rIQUsgM/z2I44CB1uwO/jmVEQCk2l4fK+ayIFLIDP89iOOBU=');
+    audio.volume = 0.5;
+    audio.play().catch(() => {
+      // Ignore play errors
+    });
+  } catch (error) {
+    // Ignore audio errors
+  }
+};
+
+export default { requestNotificationPermission, showNotification, playNotificationSound };
+

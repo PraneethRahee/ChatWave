@@ -1,0 +1,21 @@
+import Toast from './Toast';
+
+const ToastContainer = ({ toasts, removeToast }) => {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-3 pointer-events-none">
+      {toasts.map((toast) => (
+        <div key={toast.id} className="pointer-events-auto">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            duration={toast.duration || 5000}
+            onClose={() => removeToast(toast.id)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default ToastContainer;
+
