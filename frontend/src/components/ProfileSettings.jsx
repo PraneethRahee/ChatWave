@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Toast from './Toast';
 
@@ -46,7 +46,7 @@ const ProfileSettings = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/auth/profile');
+      const res = await api.get('/api/auth/profile');
       setUser(res.data);
       setFormData({
         username: res.data.username,
@@ -58,34 +58,33 @@ const ProfileSettings = () => {
         soundEnabled: true,
         darkMode: false
       });
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    } catch {
       showToast('Failed to load profile', 'error');
     }
   };
 
   const fetchSessions = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/auth/sessions');
+      const res = await api.get('/api/auth/sessions');
       setSessions(res.data);
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
+    } catch {
+      // ignore
     }
   };
 
   const fetchBlockedUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/friends/blocked');
+      const res = await api.get('/api/friends/blocked');
       setBlockedUsers(res.data);
-    } catch (error) {
-      console.error('Error fetching blocked users:', error);
+    } catch {
+      // ignore
     }
   };
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.patch('http://localhost:5000/api/auth/profile', formData);
+      const res = await api.patch('/api/auth/profile', formData);
       setUser(res.data);
       setIsEditing(false);
       showToast('Profile updated successfully', 'success');
@@ -118,7 +117,7 @@ const ProfileSettings = () => {
       const formData = new FormData();
       formData.append('avatar', newAvatar);
       
-      const res = await axios.post('http://localhost:5000/api/auth/profile/avatar', formData, {
+      const res = await api.post('/api/auth/profile/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -128,7 +127,7 @@ const ProfileSettings = () => {
       setAvatarPreview('');
       showToast('Avatar updated successfully', 'success');
       fetchUserProfile();
-    } catch (error) {
+    } catch {
       showToast('Failed to update avatar', 'error');
     }
   };
@@ -145,21 +144,21 @@ const ProfileSettings = () => {
     }
     
     try {
-      await axios.post('http://localhost:5000/api/auth/change-password', {
+      await api.post('/api/auth/change-password', {
         oldPassword: passwordData.oldPassword,
         newPassword: passwordData.newPassword
       });
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
       showToast('Password changed successfully', 'success');
-    } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to change password', 'error');
+    } catch {
+      showToast('Failed to change password', 'error');
     }
   };
 
   const handleSettingsUpdate = async (updates) => {
     try {
       const newSettings = { ...settings, ...updates };
-      const res = await axios.patch('http://localhost:5000/api/auth/settings', updates);
+      await api.patch('/api/auth/settings', updates);
       setSettings(newSettings);
       showToast('Settings updated', 'success');
       
@@ -171,27 +170,27 @@ const ProfileSettings = () => {
           document.documentElement.classList.remove('dark');
         }
       }
-    } catch (error) {
+    } catch {
       showToast('Failed to update settings', 'error');
     }
   };
 
   const handleRevokeSession = async (token) => {
     try {
-      await axios.post('http://localhost:5000/api/auth/sessions/revoke', { token });
+      await api.post('/api/auth/sessions/revoke', { token });
       showToast('Session revoked', 'success');
       fetchSessions();
-    } catch (error) {
+    } catch {
       showToast('Failed to revoke session', 'error');
     }
   };
 
   const handleUnblockUser = async (userId) => {
     try {
-      await axios.post('http://localhost:5000/api/friends/unblock', { userId });
+      await api.post('/api/friends/unblock', { userId });
       showToast('User unblocked', 'success');
       fetchBlockedUsers();
-    } catch (error) {
+    } catch {
       showToast('Failed to unblock user', 'error');
     }
   };

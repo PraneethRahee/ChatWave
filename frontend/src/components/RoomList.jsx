@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const RoomList = ({ onRoomSelect, selectedRoom }) => {
@@ -19,7 +19,7 @@ const RoomList = ({ onRoomSelect, selectedRoom }) => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/rooms');
+        const res = await api.get('/api/rooms');
         setRooms(res.data);
       } catch (error) {
         console.error('Error fetching rooms:', error);
@@ -36,7 +36,7 @@ const RoomList = ({ onRoomSelect, selectedRoom }) => {
     const fetchFriends = async () => {
       if (showCreateRoom) {
         try {
-          const res = await axios.get('http://localhost:5000/api/friends/list');
+          const res = await api.get('/api/friends/list');
           if (res.data && Array.isArray(res.data)) {
             setFriends(res.data);
           } else {
@@ -62,7 +62,7 @@ const RoomList = ({ onRoomSelect, selectedRoom }) => {
         ...newRoom,
         memberIds: selectedFriends
       };
-      const res = await axios.post('http://localhost:5000/api/rooms', roomData);
+      const res = await api.post('/api/rooms', roomData);
       setRooms([res.data, ...rooms]);
       setNewRoom({ name: '', description: '', isPrivate: false });
       setSelectedFriends([]);
@@ -86,7 +86,7 @@ const RoomList = ({ onRoomSelect, selectedRoom }) => {
   // Handle joining a room
   const handleJoinRoom = async (roomId) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/rooms/join', { roomId });
+      const res = await api.post('/api/rooms/join', { roomId });
       setRooms(rooms.map(room => 
         room._id === roomId ? res.data : room
       ));

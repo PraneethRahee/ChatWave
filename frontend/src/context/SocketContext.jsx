@@ -13,8 +13,9 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Initialize socket connection
-      const newSocket = io('http://localhost:5000');
+      // Initialize socket connection using env URL
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const newSocket = io(socketUrl, { withCredentials: true });
       
       // Connect with user ID
       newSocket.emit('userConnected', user._id);

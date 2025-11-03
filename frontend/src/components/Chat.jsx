@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import ToastContainer from './ToastContainer';
 import EmojiPicker from './EmojiPicker';
 import { requestNotificationPermission, showNotification, playNotificationSound } from '../utils/notifications';
@@ -42,7 +42,7 @@ const Chat = ({ friend }) => {
 
   const fetchUserSettings = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/auth/profile');
+      const res = await api.get('/api/auth/profile');
       setUserSettings(res.data.settings || { notifications: true, soundEnabled: true });
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -63,7 +63,7 @@ const Chat = ({ friend }) => {
     const fetchRoom = async () => {
       if (!friend) return;
       try {
-        const res = await axios.get(`http://localhost:5000/api/rooms/direct/${friend._id}`);
+        const res = await api.get(`/api/rooms/direct/${friend._id}`);
         if (res.data.isFriend === false) {
           setIsFriend(false);
           showToast('You can only message users who have accepted your friend request', 'error');
@@ -87,7 +87,7 @@ const Chat = ({ friend }) => {
     const fetchMessages = async () => {
       if (!room) return;
       try {
-        const res = await axios.get(`http://localhost:5000/api/messages/room/${room._id}`);
+        const res = await api.get(`/api/messages/room/${room._id}`);
         setMessages(res.data);
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -216,7 +216,7 @@ const Chat = ({ friend }) => {
     if (!isFriend || !room || (!newMessage.trim() && !selectedFile)) return;
     
     try {
-      const friendshipCheck = await axios.get(`http://localhost:5000/api/friends/check/${friend._id}`);
+      const friendshipCheck = await api.get(`/api/friends/check/${friend._id}`);
       if (!friendshipCheck.data.isFriend) {
         setIsFriend(false);
         showToast('User has not accepted your friend request', 'error');
@@ -231,12 +231,12 @@ const Chat = ({ friend }) => {
         formData.append('content', newMessage);
         if (replyingTo) formData.append('replyTo', replyingTo._id);
         
-        res = await axios.post('http://localhost:5000/api/messages/upload', formData, {
+        res = await api.post('/api/messages/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         clearFileSelection();
       } else {
-        res = await axios.post('http://localhost:5000/api/messages', {
+        res = await api.post('/api/messages', {
           roomId: room._id,
           content: newMessage,
           type: 'text',
@@ -274,7 +274,7 @@ const Chat = ({ friend }) => {
 
   const handleDeleteMessage = async (messageId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/messages/${messageId}`);
+      await api.delete(`/api/messages/${messageId}`);
       setMessages(prev => prev.filter(msg => msg._id !== messageId));
       showToast('Message deleted', 'success');
       setShowMessageMenu(null);
@@ -290,7 +290,7 @@ const Chat = ({ friend }) => {
       return;
     }
     try {
-      const res = await axios.patch(`http://localhost:5000/api/messages/${message._id}`, {
+      const res = await api.patch(`/api/messages/${message._id}`, {
         content: editContent
       });
       setMessages(prev => prev.map(msg => 
@@ -306,7 +306,7 @@ const Chat = ({ friend }) => {
 
   const handleAddReaction = async (messageId, emoji) => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/messages/${messageId}/reaction`, {
+      const res = await api.post(`/api/messages/${messageId}/reaction`, {
         emoji
       });
       setMessages(prev => prev.map(msg => 
@@ -323,7 +323,7 @@ const Chat = ({ friend }) => {
       return;
     }
     try {
-      const res = await axios.get(`http://localhost:5000/api/messages/room/${room._id}/search`, {
+      const res = await api.get(`/api/messages/room/${room._id}/search`, {
         params: { query: searchQuery }
       });
       setSearchResults(res.data);
@@ -337,7 +337,7 @@ const Chat = ({ friend }) => {
       return;
     }
     try {
-      await axios.post('http://localhost:5000/api/friends/remove', {
+      await api.post('/api/friends/remove', {
         userId: friend._id
       });
       showToast('Friend removed', 'success');

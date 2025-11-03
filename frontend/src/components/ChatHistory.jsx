@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const ChatHistory = ({ onFriendSelect, selectedFriend }) => {
@@ -10,7 +10,7 @@ const ChatHistory = ({ onFriendSelect, selectedFriend }) => {
   useEffect(() => {
     const fetchFriends = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/friends/list');
+        const res = await api.get('/api/friends/list');
         setFriends(res.data);
       } catch (error) {
         console.error('Error fetching friends:', error);

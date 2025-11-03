@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import ToastContainer from './ToastContainer';
 
 const RoomChat = ({ room, onRoomUpdate }) => {
@@ -44,7 +44,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
     const fetchFriends = async () => {
       if (showAddMembers) {
         try {
-          const res = await axios.get('http://localhost:5000/api/friends/list');
+          const res = await api.get('/api/friends/list');
           // Show all friends - we'll mark which ones are already members
           if (res.data && Array.isArray(res.data)) {
             setFriends(res.data);
@@ -68,7 +68,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
       if (!currentRoom) return;
 
       try {
-        const res = await axios.get(`http://localhost:5000/api/messages/room/${currentRoom._id}`);
+        const res = await api.get(`/api/messages/room/${currentRoom._id}`);
         setMessages(res.data);
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -183,7 +183,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
         formData.append('roomId', currentRoom._id);
         formData.append('content', newMessage);
         
-        res = await axios.post('http://localhost:5000/api/messages/upload', formData, {
+        res = await api.post('/api/messages/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -191,7 +191,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
         
         clearFileSelection();
       } else {
-        res = await axios.post('http://localhost:5000/api/messages', {
+        res = await api.post('/api/messages', {
           roomId: currentRoom._id,
           content: newMessage,
           type: 'text'
@@ -237,7 +237,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
     }
 
     try {
-      const res = await axios.post(`http://localhost:5000/api/rooms/${currentRoom._id}/members`, {
+      const res = await api.post(`/api/rooms/${currentRoom._id}/members`, {
         memberIds: selectedFriends
       });
       
@@ -260,7 +260,7 @@ const RoomChat = ({ room, onRoomUpdate }) => {
     }
 
     try {
-      const res = await axios.delete(`http://localhost:5000/api/rooms/${currentRoom._id}/members/${memberId}`);
+      const res = await api.delete(`/api/rooms/${currentRoom._id}/members/${memberId}`);
       
       setCurrentRoom(res.data.room);
       if (onRoomUpdate) {

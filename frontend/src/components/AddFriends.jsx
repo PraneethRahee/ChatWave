@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import Toast from './Toast';
 
 const AddFriends = () => {
@@ -12,7 +11,10 @@ const AddFriends = () => {
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [toasts, setToasts] = useState([]);
-  const { user } = useAuth();
+  
+  // Quick lookup sets for rendering states
+  const incomingFromIds = new Set(incomingRequests.map(r => r.from?._id).filter(Boolean));
+  const outgoingToIds = new Set(outgoingRequests.map(r => r.to?._id).filter(Boolean));
 
   useEffect(() => {
     fetchFriendRequests();
@@ -21,7 +23,7 @@ const AddFriends = () => {
 
   const fetchFriendRequests = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/friends/requests');
+      const res = await api.get('/api/friends/requests');
       setIncomingRequests(res.data.incoming || []);
       setOutgoingRequests(res.data.outgoing || []);
     } catch (error) {
@@ -32,7 +34,7 @@ const AddFriends = () => {
   const fetchAllUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/friends/users');
+      const res = await api.get('/api/friends/users');
       setAllUsers(res.data);
     } catch (error) {
       console.error('Error fetching all users:', error);
@@ -60,7 +62,7 @@ const AddFriends = () => {
 
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:5000/api/friends/search?query=${encodeURIComponent(searchQuery)}`);
+      const res = await api.get(`/api/friends/search?query=${encodeURIComponent(searchQuery)}`);
       setSearchResults(res.data);
     } catch (error) {
       console.error('Error searching users:', error);
@@ -82,8 +84,8 @@ const AddFriends = () => {
 
   const handleSendRequest = async (userId) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/friends/send', { userId });
-      showToast(res.data.message || 'Friend request sent!', res.data.isFriend ? 'success' : 'info');
+      const res = await api.post('/api/friends/send', { userId });
+      showToast(res.data.message || 'Friend request sent!', 'success');
       
       if (res.data.isFriend) {
         // Refresh requests if auto-accepted
@@ -107,7 +109,7 @@ const AddFriends = () => {
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      await axios.post('http://localhost:5000/api/friends/accept', { requestId });
+      await api.post('/api/friends/accept', { requestId });
       showToast('Friend request accepted!', 'success');
       fetchFriendRequests();
       fetchAllUsers(); // Refresh user list to update friend status
@@ -118,7 +120,7 @@ const AddFriends = () => {
 
   const handleRejectRequest = async (requestId) => {
     try {
-      await axios.post('http://localhost:5000/api/friends/reject', { requestId });
+      await api.post('/api/friends/reject', { requestId });
       showToast('Friend request rejected', 'info');
       fetchFriendRequests();
     } catch (error) {
@@ -128,7 +130,7 @@ const AddFriends = () => {
 
   const handleCancelRequest = async (userId) => {
     try {
-      await axios.post('http://localhost:5000/api/friends/cancel', { userId });
+      await api.post('/api/friends/cancel', { userId });
       showToast('Friend request cancelled', 'info');
       setSearchResults(searchResults.map(u => 
         u._id === userId ? { ...u, hasPendingRequest: false } : u
@@ -178,13 +180,19 @@ const AddFriends = () => {
         {incomingRequests.length > 0 && (
           <div className="p-4 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Friend Requests</h3>
+            {/* Column headers */}
+            <div className="hidden md:flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
+              <div className="flex items-center w-1/2">From</div>
+              <div className="flex items-center w-1/4">Message</div>
+              <div className="flex items-center justify-end w-1/4">Actions</div>
+            </div>
             <div className="space-y-2">
               {incomingRequests.map((request) => (
                 <div
                   key={request._id}
                   className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg"
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center w-1/2">
                     {request.from.avatar ? (
                       <img
                         src={request.from.avatar}
@@ -201,7 +209,8 @@ const AddFriends = () => {
                       <p className="text-xs text-gray-500">Wants to be your friend</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="hidden md:block w-1/4 text-xs text-gray-600">Wants to be your friend</div>
+                  <div className="flex gap-2 w-full md:w-1/4 justify-end">
                     <button
                       onClick={() => handleAcceptRequest(request._id)}
                       className="px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 text-xs font-medium transition-colors"
@@ -248,6 +257,9 @@ const AddFriends = () => {
                     <div className="ml-3">
                       <p className="text-sm font-semibold text-gray-900">{userResult.username}</p>
                       <p className="text-xs text-gray-500">{userResult.email}</p>
+                      {incomingFromIds.has(userResult._id) && (
+                        <p className="text-xs text-indigo-600 mt-0.5">Requested to connect</p>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -255,7 +267,28 @@ const AddFriends = () => {
                       <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
                         Friends
                       </span>
-                    ) : userResult.hasPendingRequest ? (
+                    ) : incomingFromIds.has(userResult._id) ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            const req = incomingRequests.find(r => r.from?._id === userResult._id);
+                            if (req) handleAcceptRequest(req._id);
+                          }}
+                          className="px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 text-xs font-medium transition-colors"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => {
+                            const req = incomingRequests.find(r => r.from?._id === userResult._id);
+                            if (req) handleRejectRequest(req._id);
+                          }}
+                          className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 text-xs font-medium transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (userResult.hasPendingRequest || outgoingToIds.has(userResult._id)) ? (
                       <button
                         onClick={() => handleCancelRequest(userResult._id)}
                         className="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs font-medium transition-colors"
@@ -327,6 +360,9 @@ const AddFriends = () => {
                             Online
                           </span>
                         )}
+                        {incomingFromIds.has(userResult._id) && (
+                          <p className="text-xs text-indigo-600 mt-0.5">Requested to connect</p>
+                        )}
                       </div>
                     </div>
                     <div>
@@ -334,7 +370,28 @@ const AddFriends = () => {
                         <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
                           Friends
                         </span>
-                      ) : userResult.hasPendingRequest ? (
+                      ) : incomingFromIds.has(userResult._id) ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const req = incomingRequests.find(r => r.from?._id === userResult._id);
+                              if (req) handleAcceptRequest(req._id);
+                            }}
+                            className="px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 text-xs font-medium transition-colors"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => {
+                              const req = incomingRequests.find(r => r.from?._id === userResult._id);
+                              if (req) handleRejectRequest(req._id);
+                            }}
+                            className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 text-xs font-medium transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (userResult.hasPendingRequest || outgoingToIds.has(userResult._id)) ? (
                         <button
                           onClick={() => handleCancelRequest(userResult._id)}
                           className="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs font-medium transition-colors"
@@ -361,13 +418,19 @@ const AddFriends = () => {
         {outgoingRequests.length > 0 && searchResults.length === 0 && (
           <div className="p-4 border-t border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Sent Requests ({outgoingRequests.length})</h3>
+            {/* Column headers */}
+            <div className="hidden md:flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
+              <div className="flex items-center w-1/2">To</div>
+              <div className="flex items-center w-1/4">Status</div>
+              <div className="flex items-center justify-end w-1/4">Actions</div>
+            </div>
             <div className="space-y-2">
               {outgoingRequests.map((request) => (
                 <div
                   key={request._id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center w-1/2">
                     {request.to.avatar ? (
                       <img
                         src={request.to.avatar}
@@ -381,15 +444,17 @@ const AddFriends = () => {
                     )}
                     <div className="ml-3">
                       <p className="text-sm font-semibold text-gray-900">{request.to.username}</p>
-                      <p className="text-xs text-gray-500">Request sent</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCancelRequest(request.to._id)}
-                    className="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  <div className="hidden md:block w-1/4 text-xs text-gray-600 capitalize">{request.status || 'pending'}</div>
+                  <div className="flex w-full md:w-1/4 justify-end">
+                    <button
+                      onClick={() => handleCancelRequest(request.to._id)}
+                      className="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
