@@ -22,16 +22,35 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.IO
+// Allowed origins for CORS (frontend URLs)
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const ALLOWED_ORIGINS = [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'];
+
+// Initialize Socket.IO with CORS configured for frontend
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"]
+    origin: (origin, callback) => {
+      // Allow no origin (e.g., mobile apps, curl) or if origin is in the list
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Import routes and controllers
