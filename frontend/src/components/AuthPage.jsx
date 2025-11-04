@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 import CharacterScene from './CharacterScene';
 import SignupVisualEffects from './SignupVisualEffects';
 import PasswordStrength from './PasswordStrength';
@@ -119,7 +119,7 @@ const AuthPage = () => {
           const formData = new FormData();
           formData.append('avatar', avatar);
           
-          const uploadRes = await axios.post('http://localhost:5000/api/auth/upload-avatar', formData, {
+          const uploadRes = await api.post('/api/auth/upload-avatar', formData, {
             headers: {
               'Content-Type': 'multipart/form-data'
             }

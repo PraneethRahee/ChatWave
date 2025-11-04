@@ -24,14 +24,34 @@ const server = http.createServer(app);
 
 // Allowed origins for CORS (frontend URLs)
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const ALLOWED_ORIGINS = [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'];
+// Add common Vercel deployment patterns
+const ALLOWED_ORIGINS = [
+  CLIENT_URL, 
+  'http://localhost:5173', 
+  'http://127.0.0.1:5173',
+  'https://chat-wave-kfop.vercel.app',
+  /^https:\/\/chat-wave-.*\.vercel\.app$/
+];
 
 // Initialize Socket.IO with CORS configured for frontend
 const io = socketIo(server, {
   cors: {
     origin: (origin, callback) => {
       // Allow no origin (e.g., mobile apps, curl) or if origin is in the list
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      if (!origin) {
+        return callback(null, true);
+      }
+      // Check if origin is in the allowed list or matches a regex pattern
+      const isAllowed = ALLOWED_ORIGINS.some(allowed => {
+        if (typeof allowed === 'string') {
+          return allowed === origin;
+        }
+        if (allowed instanceof RegExp) {
+          return allowed.test(origin);
+        }
+        return false;
+      });
+      if (isAllowed) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
@@ -44,7 +64,21 @@ const io = socketIo(server, {
 // Middleware
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // Allow no origin (e.g., mobile apps, curl) or if origin is in the list
+    if (!origin) {
+      return callback(null, true);
+    }
+    // Check if origin is in the allowed list or matches a regex pattern
+    const isAllowed = ALLOWED_ORIGINS.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      }
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+    if (isAllowed) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));

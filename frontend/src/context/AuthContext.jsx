@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 // Create context
 const AuthContext = createContext();
@@ -22,6 +22,7 @@ const SET_LOADING = 'SET_LOADING';
 const authReducer = (state, action) => {
   switch (action.type) {
     case AUTH_SUCCESS:
+      localStorage.setItem('token', action.payload.token);
       return {
         ...state,
         user: action.payload.user,
@@ -30,6 +31,7 @@ const authReducer = (state, action) => {
         isLoading: false,
       };
     case AUTH_FAILURE:
+      localStorage.removeItem('token');
       return {
         ...state,
         user: null,
@@ -38,6 +40,7 @@ const authReducer = (state, action) => {
         isLoading: false,
       };
     case LOGOUT:
+      localStorage.removeItem('token');
       return {
         ...state,
         user: null,
@@ -59,31 +62,22 @@ const authReducer = (state, action) => {
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Set up axios defaults
-  useEffect(() => {
-    if (state.token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
-      localStorage.setItem('token', state.token);
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-      localStorage.removeItem('token');
-    }
-  }, [state.token]);
-
   // Load user on app start
   useEffect(() => {
     const loadUser = async () => {
-      if (state.token) {
+      const token = localStorage.getItem('token');
+      if (token) {
         try {
-          const res = await axios.get('http://localhost:5000/api/auth/profile');
+          const res = await api.get('/api/auth/profile');
           dispatch({
             type: AUTH_SUCCESS,
             payload: {
               user: res.data,
-              token: state.token,
+              token: token,
             },
           });
         } catch (error) {
+          console.error('Load user error:', error);
           dispatch({ type: AUTH_FAILURE });
         }
       } else {
@@ -97,7 +91,7 @@ export const AuthProvider = ({ children }) => {
   // Register user
   const register = async (formData) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', formData);
+      const res = await api.post('/api/auth/register', formData);
       dispatch({
         type: AUTH_SUCCESS,
         payload: {
@@ -123,7 +117,7 @@ export const AuthProvider = ({ children }) => {
   // Login user
   const login = async (formData) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData);
+      const res = await api.post('/api/auth/login', formData);
       dispatch({
         type: AUTH_SUCCESS,
         payload: {
@@ -149,7 +143,7 @@ export const AuthProvider = ({ children }) => {
   // Logout user
   const logout = async () => {
     try {
-      await axios.post('http://localhost:5000/api/auth/logout');
+      await api.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
