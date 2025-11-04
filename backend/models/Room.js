@@ -1,56 +1,1 @@
-const mongoose = require('mongoose');
-
-const roomSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 50
-  },
-  description: {
-    type: String,
-    maxlength: 200,
-    default: ''
-  },
-  isPrivate: {
-    type: Boolean,
-    default: false
-  },
-  admin: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  members: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    joinedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  lastMessage: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  },
-  unreadCounts: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    count: {
-      type: Number,
-      default: 0
-    },
-    lastReadMessage: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Message'
-    }
-  }]
-}, {
-  timestamps: true
-});
-
-module.exports = mongoose.model('Room', roomSchema);
+const mongoose = require('mongoose');const roomSchema = new mongoose.Schema({  name: {    type: String,    required: true,    trim: true,    maxlength: 50  },  description: {    type: String,    maxlength: 200,    default: ''  },  isPrivate: {    type: Boolean,    default: false  },  admin: {    type: mongoose.Schema.Types.ObjectId,    ref: 'User',    required: true  },  members: [{    user: {      type: mongoose.Schema.Types.ObjectId,      ref: 'User'    },    joinedAt: {      type: Date,      default: Date.now    }  }],  lastMessage: {    type: mongoose.Schema.Types.ObjectId,    ref: 'Message'  },  unreadCounts: [{    user: {      type: mongoose.Schema.Types.ObjectId,      ref: 'User'    },    count: {      type: Number,      default: 0    },    lastReadMessage: {      type: mongoose.Schema.Types.ObjectId,      ref: 'Message'    }  }]}, {  timestamps: true});module.exports = mongoose.model('Room', roomSchema);

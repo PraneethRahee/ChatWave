@@ -1,301 +1,1 @@
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
-
-const AnimatedCharacter = ({ hasEmail, hasPassword }) => {
-  const groupRef = useRef();
-  const headRef = useRef();
-  const bodyRef = useRef();
-  const leftArmRef = useRef();
-  const rightArmRef = useRef();
-  const leftLegRef = useRef();
-  const rightLegRef = useRef();
-  const leftEyeRef = useRef();
-  const rightEyeRef = useRef();
-
-  // Animation state
-  const danceTime = useRef(0);
-  const sneakyTime = useRef(0);
-  const blinkTimer = useRef(0);
-  const eyeOpen = useRef(true);
-  const blinkInterval = useRef(3 + Math.random() * 2);
-
-  useFrame((state, delta) => {
-    if (!groupRef.current) return;
-
-    // Blinking animation (only when not in sneaky mode)
-    if (!hasPassword) {
-      blinkTimer.current += delta;
-      if (blinkTimer.current >= blinkInterval.current) {
-        eyeOpen.current = !eyeOpen.current;
-        if (eyeOpen.current) {
-          blinkInterval.current = 3 + Math.random() * 2;
-        } else {
-          blinkInterval.current = 0.1;
-        }
-        blinkTimer.current = 0;
-      }
-
-      if (leftEyeRef.current && rightEyeRef.current) {
-        const eyeScale = eyeOpen.current ? 1 : 0.1;
-        leftEyeRef.current.scale.y = eyeScale;
-        rightEyeRef.current.scale.y = eyeScale;
-      }
-    } else {
-      // Faster blinking when sneaky/peeking
-      blinkTimer.current += delta;
-      if (blinkTimer.current >= 0.4) {
-        eyeOpen.current = !eyeOpen.current;
-        if (eyeOpen.current) {
-          blinkInterval.current = 0.4 + Math.random() * 0.2;
-        } else {
-          blinkInterval.current = 0.15;
-        }
-        blinkTimer.current = 0;
-      }
-
-      if (leftEyeRef.current && rightEyeRef.current) {
-        const eyeScale = eyeOpen.current ? 1 : 0.1;
-        leftEyeRef.current.scale.y = eyeScale;
-        rightEyeRef.current.scale.y = eyeScale;
-      }
-    }
-
-    if (hasEmail && !hasPassword) {
-      // Dance animation - joyful
-      danceTime.current += delta * 2;
-      
-      groupRef.current.position.y = Math.sin(danceTime.current) * 0.4;
-      
-      if (bodyRef.current) {
-        bodyRef.current.rotation.z = Math.sin(danceTime.current * 2) * 0.15;
-      }
-      
-      if (leftArmRef.current) {
-        leftArmRef.current.rotation.z = Math.sin(danceTime.current * 2) * 0.8;
-        leftArmRef.current.rotation.x = Math.sin(danceTime.current * 3) * 0.4;
-      }
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.z = -Math.sin(danceTime.current * 2) * 0.8;
-        rightArmRef.current.rotation.x = -Math.sin(danceTime.current * 3) * 0.4;
-      }
-      
-      if (leftLegRef.current) {
-        leftLegRef.current.rotation.x = Math.sin(danceTime.current * 2) * 0.4;
-        leftLegRef.current.position.y = Math.sin(danceTime.current * 2) * 0.1;
-      }
-      if (rightLegRef.current) {
-        rightLegRef.current.rotation.x = -Math.sin(danceTime.current * 2) * 0.4;
-        rightLegRef.current.position.y = -Math.sin(danceTime.current * 2) * 0.1;
-      }
-      
-      if (headRef.current) {
-        headRef.current.rotation.y = Math.sin(danceTime.current * 1.5) * 0.3;
-        headRef.current.rotation.x = Math.sin(danceTime.current * 2) * 0.15;
-      }
-      
-      sneakyTime.current = 0;
-    } else if (hasPassword) {
-      // Sneaky animation - hiding face but trying to peek
-      sneakyTime.current += delta * 2;
-      
-      groupRef.current.position.y = -0.2 + Math.sin(sneakyTime.current * 0.5) * 0.05;
-      
-      const nodAmount = Math.sin(sneakyTime.current * 3) * 0.2;
-      
-      if (headRef.current) {
-        headRef.current.rotation.x = Math.PI / 6 + nodAmount;
-        headRef.current.rotation.y = Math.sin(sneakyTime.current * 0.8) * 0.3 + Math.PI / 8;
-        headRef.current.position.y = -0.15 + nodAmount * 0.3;
-      }
-      
-      if (bodyRef.current) {
-        bodyRef.current.rotation.x = Math.PI / 12;
-        bodyRef.current.position.y = Math.sin(sneakyTime.current * 3) * 0.05;
-      }
-      
-      if (leftArmRef.current) {
-        leftArmRef.current.rotation.z = Math.PI / 4;
-        leftArmRef.current.rotation.x = -Math.PI / 3;
-        leftArmRef.current.position.x = 0.15;
-        leftArmRef.current.position.y = 0.5;
-        leftArmRef.current.position.z = 0.1;
-      }
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.z = -Math.PI / 4;
-        rightArmRef.current.rotation.x = -Math.PI / 3;
-        rightArmRef.current.position.x = -0.15;
-        rightArmRef.current.position.y = 0.5;
-        rightArmRef.current.position.z = 0.1;
-      }
-      
-      if (leftLegRef.current) {
-        leftLegRef.current.rotation.x = Math.PI / 8;
-      }
-      if (rightLegRef.current) {
-        rightLegRef.current.rotation.x = Math.PI / 8;
-      }
-      
-      danceTime.current = 0;
-    } else {
-      // Idle animation
-      if (groupRef.current) {
-        groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.08;
-      }
-      
-      // Reset all to default positions
-      if (headRef.current) {
-        headRef.current.rotation.set(0, 0, 0);
-        headRef.current.position.set(0, 0.78, 0);
-      }
-      if (bodyRef.current) {
-        bodyRef.current.rotation.set(0, 0, 0);
-        bodyRef.current.position.set(0, 0.2, 0);
-      }
-      if (leftArmRef.current) {
-        leftArmRef.current.rotation.set(0, 0, 0);
-        leftArmRef.current.position.set(0.35, 0.4, 0);
-      }
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.set(0, 0, 0);
-        rightArmRef.current.position.set(-0.35, 0.4, 0);
-      }
-      if (leftLegRef.current) {
-        leftLegRef.current.rotation.set(0, 0, 0);
-        leftLegRef.current.position.set(0.15, -0.5, 0);
-      }
-      if (rightLegRef.current) {
-        rightLegRef.current.rotation.set(0, 0, 0);
-        rightLegRef.current.position.set(-0.15, -0.5, 0);
-      }
-    }
-  });
-
-  return (
-    <group ref={groupRef} position={[0, -0.3, 0]} scale={[1.2, 1.2, 1.2]}>
-      {/* Head - Properly positioned on top of body */}
-      <group ref={headRef} position={[0, 0.78, 0]}>
-        <mesh>
-          <sphereGeometry args={[0.25, 32, 32]} />
-          <meshStandardMaterial color="#D4A574" />
-        </mesh>
-        
-        {/* Eyes - Triangular, can blink */}
-        <mesh 
-          ref={leftEyeRef}
-          position={[-0.07, 0.03, 0.22]}
-          rotation={[0, 0, Math.PI]}
-        >
-          <coneGeometry args={[0.035, 0.05, 3]} />
-          <meshStandardMaterial color="#000000" />
-        </mesh>
-        <mesh 
-          ref={rightEyeRef}
-          position={[0.07, 0.03, 0.22]}
-          rotation={[0, 0, Math.PI]}
-        >
-          <coneGeometry args={[0.035, 0.05, 3]} />
-          <meshStandardMaterial color="#000000" />
-        </mesh>
-      </group>
-
-      {/* Body/Torso - Properly centered, connects to head */}
-      <mesh ref={bodyRef} position={[0, 0.2, 0]}>
-        <boxGeometry args={[0.4, 0.55, 0.3]} />
-        <meshStandardMaterial color="#4ECDC4" />
-      </mesh>
-
-      {/* Left Upper Arm - Connected at shoulder */}
-      <mesh
-        ref={leftArmRef}
-        position={[0.35, 0.4, 0]}
-      >
-        <cylinderGeometry args={[0.08, 0.08, 0.35, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-
-      {/* Right Upper Arm - Connected at shoulder */}
-      <mesh
-        ref={rightArmRef}
-        position={[-0.35, 0.4, 0]}
-      >
-        <cylinderGeometry args={[0.08, 0.08, 0.35, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-
-      {/* Left Lower Arm/Forearm */}
-      <mesh position={[0.35, 0.1, 0]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.3, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-
-      {/* Right Lower Arm/Forearm */}
-      <mesh position={[-0.35, 0.1, 0]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.3, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-
-      {/* Left Hand - At end of arm */}
-      <mesh position={[0.35, -0.05, 0]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-      
-      {/* Right Hand - At end of arm */}
-      <mesh position={[-0.35, -0.05, 0]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshStandardMaterial color="#D4A574" />
-      </mesh>
-
-      {/* Left Upper Leg/Thigh - Connected to body */}
-      <mesh
-        ref={leftLegRef}
-        position={[0.15, -0.3, 0]}
-      >
-        <cylinderGeometry args={[0.12, 0.12, 0.4, 16]} />
-        <meshStandardMaterial color="#2C3E50" />
-      </mesh>
-
-      {/* Right Upper Leg/Thigh - Connected to body */}
-      <mesh
-        ref={rightLegRef}
-        position={[-0.15, -0.3, 0]}
-      >
-        <cylinderGeometry args={[0.12, 0.12, 0.4, 16]} />
-        <meshStandardMaterial color="#2C3E50" />
-      </mesh>
-
-      {/* Left Lower Leg */}
-      <mesh position={[0.15, -0.7, 0]}>
-        <cylinderGeometry args={[0.1, 0.1, 0.35, 16]} />
-        <meshStandardMaterial color="#2C3E50" />
-      </mesh>
-
-      {/* Right Lower Leg */}
-      <mesh position={[-0.15, -0.7, 0]}>
-        <cylinderGeometry args={[0.1, 0.1, 0.35, 16]} />
-        <meshStandardMaterial color="#2C3E50" />
-      </mesh>
-
-      {/* Left Foot */}
-      <mesh position={[0.15, -0.95, 0.08]}>
-        <boxGeometry args={[0.18, 0.12, 0.25]} />
-        <meshStandardMaterial color="#1A1A1A" />
-      </mesh>
-
-      {/* Right Foot */}
-      <mesh position={[-0.15, -0.95, 0.08]}>
-        <boxGeometry args={[0.18, 0.12, 0.25]} />
-        <meshStandardMaterial color="#1A1A1A" />
-      </mesh>
-
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={1.2} />
-      <pointLight position={[-5, -5, -5]} intensity={0.6} />
-      <spotLight position={[0, 5, 3]} angle={0.4} penumbra={0.5} intensity={0.8} />
-    </group>
-  );
-};
-
-export default AnimatedCharacter;
+import { useRef } from 'react';import { useFrame } from '@react-three/fiber';import * as THREE from 'three';const AnimatedCharacter = ({ hasEmail, hasPassword }) => {  const groupRef = useRef();  const headRef = useRef();  const bodyRef = useRef();  const leftArmRef = useRef();  const rightArmRef = useRef();  const leftLegRef = useRef();  const rightLegRef = useRef();  const leftEyeRef = useRef();  const rightEyeRef = useRef();  const danceTime = useRef(0);  const sneakyTime = useRef(0);  const blinkTimer = useRef(0);  const eyeOpen = useRef(true);  const blinkInterval = useRef(3 + Math.random() * 2);  useFrame((state, delta) => {    if (!groupRef.current) return;    if (!hasPassword) {      blinkTimer.current += delta;      if (blinkTimer.current >= blinkInterval.current) {        eyeOpen.current = !eyeOpen.current;        if (eyeOpen.current) {          blinkInterval.current = 3 + Math.random() * 2;        } else {          blinkInterval.current = 0.1;        }        blinkTimer.current = 0;      }      if (leftEyeRef.current && rightEyeRef.current) {        const eyeScale = eyeOpen.current ? 1 : 0.1;        leftEyeRef.current.scale.y = eyeScale;        rightEyeRef.current.scale.y = eyeScale;      }    } else {      blinkTimer.current += delta;      if (blinkTimer.current >= 0.4) {        eyeOpen.current = !eyeOpen.current;        if (eyeOpen.current) {          blinkInterval.current = 0.4 + Math.random() * 0.2;        } else {          blinkInterval.current = 0.15;        }        blinkTimer.current = 0;      }      if (leftEyeRef.current && rightEyeRef.current) {        const eyeScale = eyeOpen.current ? 1 : 0.1;        leftEyeRef.current.scale.y = eyeScale;        rightEyeRef.current.scale.y = eyeScale;      }    }    if (hasEmail && !hasPassword) {      danceTime.current += delta * 2;      groupRef.current.position.y = Math.sin(danceTime.current) * 0.4;      if (bodyRef.current) {        bodyRef.current.rotation.z = Math.sin(danceTime.current * 2) * 0.15;      }      if (leftArmRef.current) {        leftArmRef.current.rotation.z = Math.sin(danceTime.current * 2) * 0.8;        leftArmRef.current.rotation.x = Math.sin(danceTime.current * 3) * 0.4;      }      if (rightArmRef.current) {        rightArmRef.current.rotation.z = -Math.sin(danceTime.current * 2) * 0.8;        rightArmRef.current.rotation.x = -Math.sin(danceTime.current * 3) * 0.4;      }      if (leftLegRef.current) {        leftLegRef.current.rotation.x = Math.sin(danceTime.current * 2) * 0.4;        leftLegRef.current.position.y = Math.sin(danceTime.current * 2) * 0.1;      }      if (rightLegRef.current) {        rightLegRef.current.rotation.x = -Math.sin(danceTime.current * 2) * 0.4;        rightLegRef.current.position.y = -Math.sin(danceTime.current * 2) * 0.1;      }      if (headRef.current) {        headRef.current.rotation.y = Math.sin(danceTime.current * 1.5) * 0.3;        headRef.current.rotation.x = Math.sin(danceTime.current * 2) * 0.15;      }      sneakyTime.current = 0;    } else if (hasPassword) {      sneakyTime.current += delta * 2;      groupRef.current.position.y = -0.2 + Math.sin(sneakyTime.current * 0.5) * 0.05;      const nodAmount = Math.sin(sneakyTime.current * 3) * 0.2;      if (headRef.current) {        headRef.current.rotation.x = Math.PI / 6 + nodAmount;        headRef.current.rotation.y = Math.sin(sneakyTime.current * 0.8) * 0.3 + Math.PI / 8;        headRef.current.position.y = -0.15 + nodAmount * 0.3;      }      if (bodyRef.current) {        bodyRef.current.rotation.x = Math.PI / 12;        bodyRef.current.position.y = Math.sin(sneakyTime.current * 3) * 0.05;      }      if (leftArmRef.current) {        leftArmRef.current.rotation.z = Math.PI / 4;        leftArmRef.current.rotation.x = -Math.PI / 3;        leftArmRef.current.position.x = 0.15;        leftArmRef.current.position.y = 0.5;        leftArmRef.current.position.z = 0.1;      }      if (rightArmRef.current) {        rightArmRef.current.rotation.z = -Math.PI / 4;        rightArmRef.current.rotation.x = -Math.PI / 3;        rightArmRef.current.position.x = -0.15;        rightArmRef.current.position.y = 0.5;        rightArmRef.current.position.z = 0.1;      }      if (leftLegRef.current) {        leftLegRef.current.rotation.x = Math.PI / 8;      }      if (rightLegRef.current) {        rightLegRef.current.rotation.x = Math.PI / 8;      }      danceTime.current = 0;    } else {      if (groupRef.current) {        groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.08;      }      if (headRef.current) {        headRef.current.rotation.set(0, 0, 0);        headRef.current.position.set(0, 0.78, 0);      }      if (bodyRef.current) {        bodyRef.current.rotation.set(0, 0, 0);        bodyRef.current.position.set(0, 0.2, 0);      }      if (leftArmRef.current) {        leftArmRef.current.rotation.set(0, 0, 0);        leftArmRef.current.position.set(0.35, 0.4, 0);      }      if (rightArmRef.current) {        rightArmRef.current.rotation.set(0, 0, 0);        rightArmRef.current.position.set(-0.35, 0.4, 0);      }      if (leftLegRef.current) {        leftLegRef.current.rotation.set(0, 0, 0);        leftLegRef.current.position.set(0.15, -0.5, 0);      }      if (rightLegRef.current) {        rightLegRef.current.rotation.set(0, 0, 0);        rightLegRef.current.position.set(-0.15, -0.5, 0);      }    }  });  return (    <group ref={groupRef} position={[0, -0.3, 0]} scale={[1.2, 1.2, 1.2]}>      {/* Head - Properly positioned on top of body */}      <group ref={headRef} position={[0, 0.78, 0]}>        <mesh>          <sphereGeometry args={[0.25, 32, 32]} />          <meshStandardMaterial color="#D4A574" />        </mesh>        {/* Eyes - Triangular, can blink */}        <mesh           ref={leftEyeRef}          position={[-0.07, 0.03, 0.22]}          rotation={[0, 0, Math.PI]}        >          <coneGeometry args={[0.035, 0.05, 3]} />          <meshStandardMaterial color="#000000" />        </mesh>        <mesh           ref={rightEyeRef}          position={[0.07, 0.03, 0.22]}          rotation={[0, 0, Math.PI]}        >          <coneGeometry args={[0.035, 0.05, 3]} />          <meshStandardMaterial color="#000000" />        </mesh>      </group>      {/* Body/Torso - Properly centered, connects to head */}      <mesh ref={bodyRef} position={[0, 0.2, 0]}>        <boxGeometry args={[0.4, 0.55, 0.3]} />        <meshStandardMaterial color="#4ECDC4" />      </mesh>      {/* Left Upper Arm - Connected at shoulder */}      <mesh        ref={leftArmRef}        position={[0.35, 0.4, 0]}      >        <cylinderGeometry args={[0.08, 0.08, 0.35, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Right Upper Arm - Connected at shoulder */}      <mesh        ref={rightArmRef}        position={[-0.35, 0.4, 0]}      >        <cylinderGeometry args={[0.08, 0.08, 0.35, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Left Lower Arm/Forearm */}      <mesh position={[0.35, 0.1, 0]}>        <cylinderGeometry args={[0.07, 0.07, 0.3, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Right Lower Arm/Forearm */}      <mesh position={[-0.35, 0.1, 0]}>        <cylinderGeometry args={[0.07, 0.07, 0.3, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Left Hand - At end of arm */}      <mesh position={[0.35, -0.05, 0]}>        <sphereGeometry args={[0.1, 16, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Right Hand - At end of arm */}      <mesh position={[-0.35, -0.05, 0]}>        <sphereGeometry args={[0.1, 16, 16]} />        <meshStandardMaterial color="#D4A574" />      </mesh>      {/* Left Upper Leg/Thigh - Connected to body */}      <mesh        ref={leftLegRef}        position={[0.15, -0.3, 0]}      >        <cylinderGeometry args={[0.12, 0.12, 0.4, 16]} />        <meshStandardMaterial color="#2C3E50" />      </mesh>      {/* Right Upper Leg/Thigh - Connected to body */}      <mesh        ref={rightLegRef}        position={[-0.15, -0.3, 0]}      >        <cylinderGeometry args={[0.12, 0.12, 0.4, 16]} />        <meshStandardMaterial color="#2C3E50" />      </mesh>      {/* Left Lower Leg */}      <mesh position={[0.15, -0.7, 0]}>        <cylinderGeometry args={[0.1, 0.1, 0.35, 16]} />        <meshStandardMaterial color="#2C3E50" />      </mesh>      {/* Right Lower Leg */}      <mesh position={[-0.15, -0.7, 0]}>        <cylinderGeometry args={[0.1, 0.1, 0.35, 16]} />        <meshStandardMaterial color="#2C3E50" />      </mesh>      {/* Left Foot */}      <mesh position={[0.15, -0.95, 0.08]}>        <boxGeometry args={[0.18, 0.12, 0.25]} />        <meshStandardMaterial color="#1A1A1A" />      </mesh>      {/* Right Foot */}      <mesh position={[-0.15, -0.95, 0.08]}>        <boxGeometry args={[0.18, 0.12, 0.25]} />        <meshStandardMaterial color="#1A1A1A" />      </mesh>      {/* Lighting */}      <ambientLight intensity={0.6} />      <directionalLight position={[5, 5, 5]} intensity={1.2} />      <pointLight position={[-5, -5, -5]} intensity={0.6} />      <spotLight position={[0, 5, 3]} angle={0.4} penumbra={0.5} intensity={0.8} />    </group>  );};export default AnimatedCharacter;

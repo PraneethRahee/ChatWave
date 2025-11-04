@@ -1,74 +1,1 @@
-const mongoose = require('mongoose');
-
-const messageSchema = new mongoose.Schema({
-  content: {
-    type: String,
-    trim: true,
-    maxlength: 1000
-  },
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  room: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Room',
-    required: true
-  },
-  type: {
-    type: String,
-    enum: ['text', 'image', 'file'],
-    default: 'text'
-  },
-  fileUrl: {
-    type: String,
-    default: ''
-  },
-  fileName: {
-    type: String,
-    default: ''
-  },
-  readBy: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    readAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  isDeleted: {
-    type: Boolean,
-    default: false
-  },
-  deletedAt: {
-    type: Date
-  },
-  editedAt: {
-    type: Date
-  },
-  isEdited: {
-    type: Boolean,
-    default: false
-  },
-  reactions: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    emoji: {
-      type: String,
-      required: true
-    }
-  }],
-  replyTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  }
-}, {
-  timestamps: true
-});
-
-module.exports = mongoose.model('Message', messageSchema);
+const mongoose = require('mongoose');const messageSchema = new mongoose.Schema({  content: {    type: String,    trim: true,    maxlength: 1000  },  sender: {    type: mongoose.Schema.Types.ObjectId,    ref: 'User',    required: true  },  room: {    type: mongoose.Schema.Types.ObjectId,    ref: 'Room',    required: true  },  type: {    type: String,    enum: ['text', 'image', 'file'],    default: 'text'  },  fileUrl: {    type: String,    default: ''  },  fileName: {    type: String,    default: ''  },  readBy: [{    user: {      type: mongoose.Schema.Types.ObjectId,      ref: 'User'    },    readAt: {      type: Date,      default: Date.now    }  }],  isDeleted: {    type: Boolean,    default: false  },  deletedAt: {    type: Date  },  editedAt: {    type: Date  },  isEdited: {    type: Boolean,    default: false  },  reactions: [{    user: {      type: mongoose.Schema.Types.ObjectId,      ref: 'User'    },    emoji: {      type: String,      required: true    }  }],  replyTo: {    type: mongoose.Schema.Types.ObjectId,    ref: 'Message'  }}, {  timestamps: true});module.exports = mongoose.model('Message', messageSchema);

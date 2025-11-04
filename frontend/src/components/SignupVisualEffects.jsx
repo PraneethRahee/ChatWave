@@ -1,295 +1,1 @@
-import { useEffect, useRef } from 'react';
-
-const SignupVisualEffects = ({ 
-  hasUsername, 
-  hasEmail, 
-  hasPassword, 
-  hasConfirmPassword,
-  hasAvatar
-}) => {
-  const canvasRef = useRef(null);
-  const animationFrameRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth / 2;
-    canvas.height = window.innerHeight;
-
-    let time = 0;
-    const particles = [];
-    const stars = [];
-
-    // Create different particles for signup (more celebration-like)
-    for (let i = 0; i < 60; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        radius: Math.random() * 4 + 1,
-        speedX: (Math.random() - 0.5) * 0.8,
-        speedY: (Math.random() - 0.5) * 0.8,
-        hue: (240 + Math.random() * 60) % 360, // Blue-purple range
-        rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.05,
-      });
-    }
-
-    // Create stars for signup (more magical)
-    for (let i = 0; i < 100; i++) {
-      stars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 2 + 0.5,
-        twinkle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.02 + 0.01,
-      });
-    }
-
-    const animate = () => {
-      // Clear with different background style for signup
-      ctx.fillStyle = 'rgba(249, 250, 251, 0.08)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      time += 0.015;
-
-      // Animate stars
-      stars.forEach((star) => {
-        star.twinkle += star.speed;
-        const brightness = (Math.sin(star.twinkle) + 1) / 2;
-        
-        ctx.fillStyle = `rgba(99, 102, 241, ${brightness * 0.8})`;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size * (0.5 + brightness * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Animate particles with different behavior
-      particles.forEach((particle, i) => {
-        particle.rotation += particle.rotationSpeed;
-        
-        // More energetic movement when fields are filled
-        if (hasUsername || hasEmail) {
-          particle.x += particle.speedX * 1.5 + Math.sin(time * 3 + i) * 1.5;
-          particle.y += particle.speedY * 1.5 + Math.cos(time * 3 + i) * 1.5;
-          particle.hue = (particle.hue + 3) % 360;
-        } else {
-          particle.x += particle.speedX;
-          particle.y += particle.speedY;
-        }
-
-        // Bounce off edges
-        if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;
-        if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;
-
-        // Special effect when password is entered
-        if (hasPassword && hasConfirmPassword) {
-          particle.x += Math.sin(time * 4 + i) * 3;
-          particle.y += Math.cos(time * 4 + i) * 3;
-        }
-
-        // Draw particle with rotation
-        ctx.save();
-        ctx.translate(particle.x, particle.y);
-        ctx.rotate(particle.rotation);
-        
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, particle.radius * 4);
-        gradient.addColorStop(0, `hsla(${particle.hue}, 80%, 65%, 0.9)`);
-        gradient.addColorStop(0.5, `hsla(${particle.hue + 30}, 70%, 60%, 0.5)`);
-        gradient.addColorStop(1, `hsla(${particle.hue}, 70%, 60%, 0)`);
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        // Draw as star shape
-        for (let j = 0; j < 5; j++) {
-          const angle = (j * 4 * Math.PI) / 5;
-          const x = Math.cos(angle) * particle.radius * 3;
-          const y = Math.sin(angle) * particle.radius * 3;
-          if (j === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
-
-        // Connect nearby particles with different style
-        particles.slice(i + 1).forEach((otherParticle) => {
-          const dx = particle.x - otherParticle.x;
-          const dy = particle.y - otherParticle.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < 120) {
-            ctx.strokeStyle = `hsla(${(particle.hue + otherParticle.hue) / 2}, 75%, 65%, ${0.4 * (1 - distance / 120)})`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(particle.x, particle.y);
-            ctx.lineTo(otherParticle.x, otherParticle.y);
-            ctx.stroke();
-          }
-        });
-      });
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      canvas.width = window.innerWidth / 2;
-      canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [hasUsername, hasEmail, hasPassword, hasConfirmPassword, hasAvatar]);
-
-  return (
-    <div className="w-full h-full relative overflow-hidden bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
-      {/* Animated Background Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ background: 'transparent' }}
-      />
-
-      {/* Geometric Patterns - Different style for signup */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Hexagonal shapes */}
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={`hex-${i}`}
-            className="absolute opacity-15"
-            style={{
-              width: `${80 + i * 40}px`,
-              height: `${80 + i * 40}px`,
-              left: `${5 + i * 12}%`,
-              top: `${10 + i * 8}%`,
-              background: `linear-gradient(135deg, 
-                hsl(${200 + i * 15}, 70%, 65%), 
-                hsl(${220 + i * 15}, 70%, 55%))`,
-              clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',
-              animation: `hexFloat${i % 4} ${12 + i * 1.5}s ease-in-out infinite`,
-              animationDelay: `${i * 0.4}s`,
-              filter: 'blur(20px)',
-            }}
-          />
-        ))}
-
-        {/* Diamond shapes */}
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={`diamond-${i}`}
-            className="absolute opacity-20"
-            style={{
-              width: `${100 + i * 60}px`,
-              height: `${100 + i * 60}px`,
-              left: `${50 + i * 8}%`,
-              top: `${20 + i * 12}%`,
-              background: hasEmail
-                ? `radial-gradient(circle, 
-                    hsl(${190 + i * 20}, 75%, 70%), 
-                    hsl(${210 + i * 20}, 75%, 50%), 
-                    transparent)`
-                : `radial-gradient(circle, 
-                    hsl(${200 + i * 25}, 70%, 60%), 
-                    transparent)`,
-              clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-              opacity: hasUsername && hasEmail ? 0.3 : hasEmail ? 0.25 : 0.2,
-              animation: `diamondSpin${i % 3} ${10 + i * 2}s linear infinite`,
-              animationDelay: `${i * 0.5}s`,
-              filter: 'blur(25px)',
-              transform: hasPassword && hasConfirmPassword
-                ? `scale(${1 + Math.sin(Date.now() / 800 + i) * 0.4}) rotate(${i * 45}deg)`
-                : `scale(1) rotate(${i * 30}deg)`,
-              transition: 'all 0.6s ease',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Wave Effect */}
-      <div
-        className="absolute inset-0 opacity-25"
-        style={{
-          background: hasPassword && hasConfirmPassword
-            ? 'linear-gradient(135deg, transparent 25%, rgba(99, 102, 241, 0.2) 50%, transparent 75%)'
-            : 'linear-gradient(135deg, transparent 25%, rgba(59, 130, 246, 0.15) 50%, transparent 75%)',
-          backgroundSize: '300% 300%',
-          animation: hasPassword && hasConfirmPassword ? 'wave 4s linear infinite' : 'wave 8s linear infinite',
-        }}
-      />
-
-      {/* Progress Indicators */}
-      {(hasUsername || hasEmail || hasPassword || hasConfirmPassword) && !hasPassword && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center px-8 space-y-6">
-            {hasUsername && hasEmail ? (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="text-6xl md:text-8xl font-bold animate-bounce">
-                  🌟
-                </div>
-                <p className="text-xl md:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                  Great Progress!
-                </p>
-              </div>
-            ) : hasUsername ? (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="text-5xl md:text-7xl font-bold">
-                  👤
-                </div>
-                <p className="text-lg md:text-xl font-semibold text-gray-700">
-                  Good start!
-                </p>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {/* Completion Message */}
-      {hasUsername && hasEmail && hasPassword && hasConfirmPassword && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center px-8 space-y-6 animate-fadeIn">
-            <div className="text-7xl md:text-9xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 bg-clip-text text-transparent animate-pulse">
-              ✨
-            </div>
-            <p className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
-              Almost Ready!
-            </p>
-            <p className="text-lg text-gray-600">Just upload your avatar</p>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Icons */}
-      {(hasPassword && hasConfirmPassword) && (
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={`icon-${i}`}
-              className="absolute text-4xl opacity-20"
-              style={{
-                left: `${20 + i * 15}%`,
-                top: `${15 + i * 12}%`,
-                animation: `iconFloat${i % 3} ${6 + i}s ease-in-out infinite`,
-                animationDelay: `${i * 0.3}s`,
-              }}
-            >
-              {['🎉', '🚀', '💫', '⭐', '🎊', '🌟'][i]}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default SignupVisualEffects;
-
+import { useEffect, useRef } from 'react';const SignupVisualEffects = ({   hasUsername,   hasEmail,   hasPassword,   hasConfirmPassword,  hasAvatar}) => {  const canvasRef = useRef(null);  const animationFrameRef = useRef(null);  useEffect(() => {    const canvas = canvasRef.current;    if (!canvas) return;    const ctx = canvas.getContext('2d');    canvas.width = window.innerWidth / 2;    canvas.height = window.innerHeight;    let time = 0;    const particles = [];    const stars = [];    for (let i = 0; i < 60; i++) {      particles.push({        x: Math.random() * canvas.width,        y: Math.random() * canvas.height,        radius: Math.random() * 4 + 1,        speedX: (Math.random() - 0.5) * 0.8,        speedY: (Math.random() - 0.5) * 0.8,        hue: (240 + Math.random() * 60) % 360,         rotation: Math.random() * Math.PI * 2,        rotationSpeed: (Math.random() - 0.5) * 0.05,      });    }    for (let i = 0; i < 100; i++) {      stars.push({        x: Math.random() * canvas.width,        y: Math.random() * canvas.height,        size: Math.random() * 2 + 0.5,        twinkle: Math.random() * Math.PI * 2,        speed: Math.random() * 0.02 + 0.01,      });    }    const animate = () => {      ctx.fillStyle = 'rgba(249, 250, 251, 0.08)';      ctx.fillRect(0, 0, canvas.width, canvas.height);      time += 0.015;      stars.forEach((star) => {        star.twinkle += star.speed;        const brightness = (Math.sin(star.twinkle) + 1) / 2;        ctx.fillStyle = `rgba(99, 102, 241, ${brightness * 0.8})`;        ctx.beginPath();        ctx.arc(star.x, star.y, star.size * (0.5 + brightness * 0.5), 0, Math.PI * 2);        ctx.fill();      });      particles.forEach((particle, i) => {        particle.rotation += particle.rotationSpeed;        if (hasUsername || hasEmail) {          particle.x += particle.speedX * 1.5 + Math.sin(time * 3 + i) * 1.5;          particle.y += particle.speedY * 1.5 + Math.cos(time * 3 + i) * 1.5;          particle.hue = (particle.hue + 3) % 360;        } else {          particle.x += particle.speedX;          particle.y += particle.speedY;        }        if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;        if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;        if (hasPassword && hasConfirmPassword) {          particle.x += Math.sin(time * 4 + i) * 3;          particle.y += Math.cos(time * 4 + i) * 3;        }        ctx.save();        ctx.translate(particle.x, particle.y);        ctx.rotate(particle.rotation);        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, particle.radius * 4);        gradient.addColorStop(0, `hsla(${particle.hue}, 80%, 65%, 0.9)`);        gradient.addColorStop(0.5, `hsla(${particle.hue + 30}, 70%, 60%, 0.5)`);        gradient.addColorStop(1, `hsla(${particle.hue}, 70%, 60%, 0)`);        ctx.fillStyle = gradient;        ctx.beginPath();        for (let j = 0; j < 5; j++) {          const angle = (j * 4 * Math.PI) / 5;          const x = Math.cos(angle) * particle.radius * 3;          const y = Math.sin(angle) * particle.radius * 3;          if (j === 0) ctx.moveTo(x, y);          else ctx.lineTo(x, y);        }        ctx.closePath();        ctx.fill();        ctx.restore();        particles.slice(i + 1).forEach((otherParticle) => {          const dx = particle.x - otherParticle.x;          const dy = particle.y - otherParticle.y;          const distance = Math.sqrt(dx * dx + dy * dy);          if (distance < 120) {            ctx.strokeStyle = `hsla(${(particle.hue + otherParticle.hue) / 2}, 75%, 65%, ${0.4 * (1 - distance / 120)})`;            ctx.lineWidth = 1.5;            ctx.beginPath();            ctx.moveTo(particle.x, particle.y);            ctx.lineTo(otherParticle.x, otherParticle.y);            ctx.stroke();          }        });      });      animationFrameRef.current = requestAnimationFrame(animate);    };    animate();    const handleResize = () => {      canvas.width = window.innerWidth / 2;      canvas.height = window.innerHeight;    };    window.addEventListener('resize', handleResize);    return () => {      if (animationFrameRef.current) {        cancelAnimationFrame(animationFrameRef.current);      }      window.removeEventListener('resize', handleResize);    };  }, [hasUsername, hasEmail, hasPassword, hasConfirmPassword, hasAvatar]);  return (    <div className="w-full h-full relative overflow-hidden bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">      {/* Animated Background Canvas */}      <canvas        ref={canvasRef}        className="absolute inset-0 w-full h-full"        style={{ background: 'transparent' }}      />      {/* Geometric Patterns - Different style for signup */}      <div className="absolute inset-0 overflow-hidden">        {/* Hexagonal shapes */}        {[...Array(8)].map((_, i) => (          <div            key={`hex-${i}`}            className="absolute opacity-15"            style={{              width: `${80 + i * 40}px`,              height: `${80 + i * 40}px`,              left: `${5 + i * 12}%`,              top: `${10 + i * 8}%`,              background: `linear-gradient(135deg,                 hsl(${200 + i * 15}, 70%, 65%),                 hsl(${220 + i * 15}, 70%, 55%))`,              clipPath: 'polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%)',              animation: `hexFloat${i % 4} ${12 + i * 1.5}s ease-in-out infinite`,              animationDelay: `${i * 0.4}s`,              filter: 'blur(20px)',            }}          />        ))}        {/* Diamond shapes */}        {[...Array(5)].map((_, i) => (          <div            key={`diamond-${i}`}            className="absolute opacity-20"            style={{              width: `${100 + i * 60}px`,              height: `${100 + i * 60}px`,              left: `${50 + i * 8}%`,              top: `${20 + i * 12}%`,              background: hasEmail                ? `radial-gradient(circle,                     hsl(${190 + i * 20}, 75%, 70%),                     hsl(${210 + i * 20}, 75%, 50%),                     transparent)`                : `radial-gradient(circle,                     hsl(${200 + i * 25}, 70%, 60%),                     transparent)`,              clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',              opacity: hasUsername && hasEmail ? 0.3 : hasEmail ? 0.25 : 0.2,              animation: `diamondSpin${i % 3} ${10 + i * 2}s linear infinite`,              animationDelay: `${i * 0.5}s`,              filter: 'blur(25px)',              transform: hasPassword && hasConfirmPassword                ? `scale(${1 + Math.sin(Date.now() / 800 + i) * 0.4}) rotate(${i * 45}deg)`                : `scale(1) rotate(${i * 30}deg)`,              transition: 'all 0.6s ease',            }}          />        ))}      </div>      {/* Wave Effect */}      <div        className="absolute inset-0 opacity-25"        style={{          background: hasPassword && hasConfirmPassword            ? 'linear-gradient(135deg, transparent 25%, rgba(99, 102, 241, 0.2) 50%, transparent 75%)'            : 'linear-gradient(135deg, transparent 25%, rgba(59, 130, 246, 0.15) 50%, transparent 75%)',          backgroundSize: '300% 300%',          animation: hasPassword && hasConfirmPassword ? 'wave 4s linear infinite' : 'wave 8s linear infinite',        }}      />      {/* Progress Indicators */}      {(hasUsername || hasEmail || hasPassword || hasConfirmPassword) && !hasPassword && (        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">          <div className="text-center px-8 space-y-6">            {hasUsername && hasEmail ? (              <div className="space-y-4 animate-fadeIn">                <div className="text-6xl md:text-8xl font-bold animate-bounce">                  🌟                </div>                <p className="text-xl md:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">                  Great Progress!                </p>              </div>            ) : hasUsername ? (              <div className="space-y-4 animate-fadeIn">                <div className="text-5xl md:text-7xl font-bold">                  👤                </div>                <p className="text-lg md:text-xl font-semibold text-gray-700">                  Good start!                </p>              </div>            ) : null}          </div>        </div>      )}      {/* Completion Message */}      {hasUsername && hasEmail && hasPassword && hasConfirmPassword && (        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">          <div className="text-center px-8 space-y-6 animate-fadeIn">            <div className="text-7xl md:text-9xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 bg-clip-text text-transparent animate-pulse">              ✨            </div>            <p className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">              Almost Ready!            </p>            <p className="text-lg text-gray-600">Just upload your avatar</p>          </div>        </div>      )}      {/* Floating Icons */}      {(hasPassword && hasConfirmPassword) && (        <div className="absolute inset-0 pointer-events-none">          {[...Array(6)].map((_, i) => (            <div              key={`icon-${i}`}              className="absolute text-4xl opacity-20"              style={{                left: `${20 + i * 15}%`,                top: `${15 + i * 12}%`,                animation: `iconFloat${i % 3} ${6 + i}s ease-in-out infinite`,                animationDelay: `${i * 0.3}s`,              }}            >              {['🎉', '🚀', '💫', '⭐', '🎊', '🌟'][i]}            </div>          ))}        </div>      )}    </div>  );};export default SignupVisualEffects;

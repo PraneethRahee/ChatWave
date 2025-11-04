@@ -1,298 +1,1 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-
-// Generate JWT token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
-};
-
-// Register user
-const register = async (req, res) => {
-  try {
-    const { username, email, password, avatar } = req.body;
-
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Create user
-    const user = await User.create({
-      username,
-      email,
-      password,
-      avatar: avatar || '',
-    });
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
-      token,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Upload avatar (for registration)
-const uploadAvatar = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
-    }
-
-    // For Cloudinary, the file URL is in req.file.path
-    const avatarUrl = req.file.path;
-
-    res.json({
-      avatarUrl,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Login user
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const device = req.headers['user-agent'] || 'Unknown';
-    const ip = req.ip || req.connection.remoteAddress || 'Unknown';
-
-    // Check for user email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Check if password matches
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Update user status to online
-    user.status = 'online';
-    user.lastSeen = new Date();
-
-    // Generate token and create session
-    const token = generateToken(user._id);
-    
-    // Add session
-    user.sessions.push({
-      token,
-      device,
-      ip,
-      createdAt: new Date(),
-      lastActivity: new Date()
-    });
-
-    // Keep only last 5 sessions
-    if (user.sessions.length > 5) {
-      user.sessions = user.sessions.slice(-5);
-    }
-
-    await user.save();
-
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
-      settings: user.settings,
-      token,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Get user profile
-const getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('-password -sessions');
-    res.json(user);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Update user profile
-const updateProfile = async (req, res) => {
-  try {
-    const { username, email, status } = req.body;
-    const user = await User.findById(req.user._id);
-    
-    if (username && username !== user.username) {
-      const usernameExists = await User.findOne({ username, _id: { $ne: user._id } });
-      if (usernameExists) {
-        return res.status(400).json({ message: 'Username already taken' });
-      }
-      user.username = username;
-    }
-    
-    if (email && email !== user.email) {
-      const emailExists = await User.findOne({ email, _id: { $ne: user._id } });
-      if (emailExists) {
-        return res.status(400).json({ message: 'Email already taken' });
-      }
-      user.email = email;
-    }
-    
-    if (status && ['online', 'offline', 'away'].includes(status)) {
-      user.status = status;
-    }
-    
-    await user.save();
-    
-    const userResponse = await User.findById(user._id).select('-password -sessions');
-    res.json(userResponse);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Update user avatar
-const updateAvatar = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
-    }
-    
-    const user = await User.findById(req.user._id);
-    user.avatar = req.file.path;
-    await user.save();
-    
-    const userResponse = await User.findById(user._id).select('-password -sessions');
-    res.json(userResponse);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Change password
-const changePassword = async (req, res) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-    
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({ message: 'Please provide old and new password' });
-    }
-    
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-    
-    const user = await User.findById(req.user._id);
-    const isMatch = await user.comparePassword(oldPassword);
-    
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid old password' });
-    }
-    
-    user.password = newPassword;
-    await user.save();
-    
-    res.json({ message: 'Password changed successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Update user settings
-const updateSettings = async (req, res) => {
-  try {
-    const { notifications, soundEnabled, darkMode } = req.body;
-    const user = await User.findById(req.user._id);
-    
-    if (notifications !== undefined) user.settings.notifications = notifications;
-    if (soundEnabled !== undefined) user.settings.soundEnabled = soundEnabled;
-    if (darkMode !== undefined) user.settings.darkMode = darkMode;
-    
-    await user.save();
-    
-    const userResponse = await User.findById(user._id).select('-password -sessions');
-    res.json(userResponse);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Logout user
-const logout = async (req, res) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    const user = await User.findById(req.user._id);
-    
-    // Remove session
-    if (token) {
-      user.sessions = user.sessions.filter(s => s.token !== token);
-    }
-    
-    user.status = 'offline';
-    user.lastSeen = new Date();
-    await user.save();
-    
-    res.json({ message: 'Logged out successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Get active sessions
-const getSessions = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('sessions');
-    res.json(user.sessions || []);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Revoke session
-const revokeSession = async (req, res) => {
-  try {
-    const { token } = req.body;
-    const user = await User.findById(req.user._id);
-    
-    user.sessions = user.sessions.filter(s => s.token !== token);
-    await user.save();
-    
-    res.json({ message: 'Session revoked successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-module.exports = {
-  register,
-  login,
-  getProfile,
-  logout,
-  uploadAvatar,
-  updateProfile,
-  updateAvatar,
-  changePassword,
-  updateSettings,
-  getSessions,
-  revokeSession,
-};
+const jwt = require('jsonwebtoken');const User = require('../models/User');const generateToken = (id) => {  return jwt.sign({ id }, process.env.JWT_SECRET, {    expiresIn: '30d',  });};const register = async (req, res) => {  try {    const { username, email, password, avatar } = req.body;    const userExists = await User.findOne({ $or: [{ email }, { username }] });    if (userExists) {      return res.status(400).json({ message: 'User already exists' });    }    const user = await User.create({      username,      email,      password,      avatar: avatar || '',    });    const token = generateToken(user._id);    res.status(201).json({      _id: user._id,      username: user.username,      email: user.email,      avatar: user.avatar,      token,    });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const uploadAvatar = async (req, res) => {  try {    if (!req.file) {      return res.status(400).json({ message: 'No file uploaded' });    }    const avatarUrl = req.file.path;    res.json({      avatarUrl,    });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const login = async (req, res) => {  try {    const { email, password } = req.body;    const device = req.headers['user-agent'] || 'Unknown';    const ip = req.ip || req.connection.remoteAddress || 'Unknown';    const user = await User.findOne({ email });    if (!user) {      return res.status(401).json({ message: 'Invalid credentials' });    }    const isMatch = await user.comparePassword(password);    if (!isMatch) {      return res.status(401).json({ message: 'Invalid credentials' });    }    user.status = 'online';    user.lastSeen = new Date();    const token = generateToken(user._id);    user.sessions.push({      token,      device,      ip,      createdAt: new Date(),      lastActivity: new Date()    });    if (user.sessions.length > 5) {      user.sessions = user.sessions.slice(-5);    }    await user.save();    res.json({      _id: user._id,      username: user.username,      email: user.email,      avatar: user.avatar,      settings: user.settings,      token,    });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const getProfile = async (req, res) => {  try {    const user = await User.findById(req.user._id).select('-password -sessions');    res.json(user);  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const updateProfile = async (req, res) => {  try {    const { username, email, status } = req.body;    const user = await User.findById(req.user._id);    if (username && username !== user.username) {      const usernameExists = await User.findOne({ username, _id: { $ne: user._id } });      if (usernameExists) {        return res.status(400).json({ message: 'Username already taken' });      }      user.username = username;    }    if (email && email !== user.email) {      const emailExists = await User.findOne({ email, _id: { $ne: user._id } });      if (emailExists) {        return res.status(400).json({ message: 'Email already taken' });      }      user.email = email;    }    if (status && ['online', 'offline', 'away'].includes(status)) {      user.status = status;    }    await user.save();    const userResponse = await User.findById(user._id).select('-password -sessions');    res.json(userResponse);  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const updateAvatar = async (req, res) => {  try {    if (!req.file) {      return res.status(400).json({ message: 'No file uploaded' });    }    const user = await User.findById(req.user._id);    user.avatar = req.file.path;    await user.save();    const userResponse = await User.findById(user._id).select('-password -sessions');    res.json(userResponse);  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const changePassword = async (req, res) => {  try {    const { oldPassword, newPassword } = req.body;    if (!oldPassword || !newPassword) {      return res.status(400).json({ message: 'Please provide old and new password' });    }    if (newPassword.length < 6) {      return res.status(400).json({ message: 'Password must be at least 6 characters' });    }    const user = await User.findById(req.user._id);    const isMatch = await user.comparePassword(oldPassword);    if (!isMatch) {      return res.status(401).json({ message: 'Invalid old password' });    }    user.password = newPassword;    await user.save();    res.json({ message: 'Password changed successfully' });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const updateSettings = async (req, res) => {  try {    const { notifications, soundEnabled, darkMode } = req.body;    const user = await User.findById(req.user._id);    if (notifications !== undefined) user.settings.notifications = notifications;    if (soundEnabled !== undefined) user.settings.soundEnabled = soundEnabled;    if (darkMode !== undefined) user.settings.darkMode = darkMode;    await user.save();    const userResponse = await User.findById(user._id).select('-password -sessions');    res.json(userResponse);  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const logout = async (req, res) => {  try {    const token = req.header('Authorization')?.replace('Bearer ', '');    const user = await User.findById(req.user._id);    if (token) {      user.sessions = user.sessions.filter(s => s.token !== token);    }    user.status = 'offline';    user.lastSeen = new Date();    await user.save();    res.json({ message: 'Logged out successfully' });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const getSessions = async (req, res) => {  try {    const user = await User.findById(req.user._id).select('sessions');    res.json(user.sessions || []);  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};const revokeSession = async (req, res) => {  try {    const { token } = req.body;    const user = await User.findById(req.user._id);    user.sessions = user.sessions.filter(s => s.token !== token);    await user.save();    res.json({ message: 'Session revoked successfully' });  } catch (error) {    console.error(error);    res.status(500).json({ message: 'Server error' });  }};module.exports = {  register,  login,  getProfile,  logout,  uploadAvatar,  updateProfile,  updateAvatar,  changePassword,  updateSettings,  getSessions,  revokeSession,};

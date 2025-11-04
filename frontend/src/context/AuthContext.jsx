@@ -1,24 +1,16 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import api from '../services/api';
-
-// Create context
 const AuthContext = createContext();
-
-// Initial state
 const initialState = {
   user: null,
   token: localStorage.getItem('token'),
   isLoading: true,
   isAuthenticated: false,
 };
-
-// Action types
 const AUTH_SUCCESS = 'AUTH_SUCCESS';
 const AUTH_FAILURE = 'AUTH_FAILURE';
 const LOGOUT = 'LOGOUT';
 const SET_LOADING = 'SET_LOADING';
-
-// Reducer
 const authReducer = (state, action) => {
   switch (action.type) {
     case AUTH_SUCCESS:
@@ -57,12 +49,8 @@ const authReducer = (state, action) => {
       return state;
   }
 };
-
-// Auth provider
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-
-  // Load user on app start
   useEffect(() => {
     const loadUser = async () => {
       const token = localStorage.getItem('token');
@@ -84,11 +72,8 @@ export const AuthProvider = ({ children }) => {
         dispatch({ type: AUTH_FAILURE });
       }
     };
-
     loadUser();
   }, []);
-
-  // Register user
   const register = async (formData) => {
     try {
       const res = await api.post('/api/auth/register', formData);
@@ -113,8 +98,6 @@ export const AuthProvider = ({ children }) => {
       };
     }
   };
-
-  // Login user
   const login = async (formData) => {
     try {
       const res = await api.post('/api/auth/login', formData);
@@ -139,8 +122,6 @@ export const AuthProvider = ({ children }) => {
       };
     }
   };
-
-  // Logout user
   const logout = async () => {
     try {
       await api.post('/api/auth/logout');
@@ -150,7 +131,6 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: LOGOUT });
     }
   };
-
   return (
     <AuthContext.Provider
       value={{
@@ -164,8 +144,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -173,5 +151,4 @@ export const useAuth = () => {
   }
   return context;
 };
-
 export default AuthContext;
